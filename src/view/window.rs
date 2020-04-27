@@ -16,17 +16,22 @@ use piston_window::Window;
 use piston_window::*;
 
 use crate::vec_utils::Matrix4;
-use crate::view::SoundSourceViewer;
+use crate::view::{AcousticFiledSliceViewer, SoundSourceViewer};
 
 pub struct ViewWindow {
+    pub update: Option<fn(&mut SoundSourceViewer, &mut AcousticFiledSliceViewer) -> ()>,
     sound_source_viewer: SoundSourceViewer,
+    field_slice_viewer: AcousticFiledSliceViewer,
     projection: Matrix4,
     camera: Camera<f32>,
     window: PistonWindow,
 }
 
 impl ViewWindow {
-    pub fn new(sound_source_viewer: SoundSourceViewer) -> ViewWindow {
+    pub fn new(
+        sound_source_viewer: SoundSourceViewer,
+        field_slice_viewer: AcousticFiledSliceViewer,
+    ) -> ViewWindow {
         let opengl = OpenGL::V3_2;
         let mut window: PistonWindow = WindowSettings::new("", [640, 480])
             .exit_on_esc(true)
@@ -45,8 +50,13 @@ impl ViewWindow {
         let mut sound_source_viewer = sound_source_viewer;
         sound_source_viewer.render_setting(&window, opengl);
 
+        let mut field_slice_viewer = field_slice_viewer;
+        field_slice_viewer.render_setting(&window, opengl);
+
         ViewWindow {
+            update: None,
             sound_source_viewer,
+            field_slice_viewer,
             projection,
             camera,
             window,
@@ -57,20 +67,27 @@ impl ViewWindow {
         let mut last = std::time::Instant::now();
         let mut window = self.window;
         let mut sound_source_viewer = self.sound_source_viewer;
+        let mut field_slice_viewer = self.field_slice_viewer;
+        let update = self.update;
         let camera = self.camera;
         let mut projection = self.projection;
         while let Some(e) = window.next() {
+            if let Some(update_fn) = update {
+                update_fn(&mut sound_source_viewer, &mut field_slice_viewer);
+            }
+
             window.draw_3d(&e, |window| {
                 window
                     .encoder
                     .clear(&window.output_color, [0.3, 0.3, 0.3, 1.0]);
                 window.encoder.clear_depth(&window.output_stencil, 1.0);
+                field_slice_viewer.renderer(window, &e, camera.orthogonal(), projection);
                 sound_source_viewer.renderer(window, &e, camera.orthogonal(), projection);
             });
             if e.resize_args().is_some() {
                 projection = ViewWindow::get_projection(&window);
             }
-            println!("{:.2}", last.elapsed().as_millis() as f64);
+            // println!("{:.2}", last.elapsed().as_millis() as f64);
             last = std::time::Instant::now();
         }
     }

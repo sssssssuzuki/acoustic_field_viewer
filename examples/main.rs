@@ -31,8 +31,8 @@ pub fn main() {
 
     let mut transducers = Vec::new();
     let zdir = [0., 0., 1.];
-    for x in 0..NUM_TRANS_X {
-        for y in 0..NUM_TRANS_Y {
+    for y in 0..NUM_TRANS_Y {
+        for x in 0..NUM_TRANS_X {
             let pos = [TRANS_SZIE * x as f32, TRANS_SZIE * y as f32, 0.];
             let d = vec_utils::dist(pos, focal_pos);
             let phase = (d % WAVE_LENGTH) / WAVE_LENGTH;
@@ -47,6 +47,9 @@ pub fn main() {
         SoundSourceSettings::new(40e3, TRANS_SZIE, coloring_hsv),
     );
 
-    let window = ViewWindow::new(source_viewer);
+    let mut acoustic_field_viewer = AcousticFiledSliceViewer::new(&transducers);
+    acoustic_field_viewer.translate(focal_pos);
+
+    let window = ViewWindow::new(source_viewer, acoustic_field_viewer);
     window.start();
 }
