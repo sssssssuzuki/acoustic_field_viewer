@@ -22,6 +22,7 @@ pub struct ViewerSettings {
     pub trans_coloring: ColoringMethod,
     pub field_color_map: ListedColorMap,
     pub color_scale: f32,
+    pub slice_alpha: f32,
 }
 
 impl ViewerSettings {
@@ -38,6 +39,7 @@ impl ViewerSettings {
             trans_coloring,
             field_color_map,
             color_scale: 1.0,
+            slice_alpha: 1.0,
         }
     }
 }

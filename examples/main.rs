@@ -24,8 +24,8 @@ use acoustic_field_viewer::view::{
 };
 
 pub fn main() {
-    const NUM_TRANS_X: usize = 36;
-    const NUM_TRANS_Y: usize = 28;
+    const NUM_TRANS_X: usize = 18;
+    const NUM_TRANS_Y: usize = 14;
     const TRANS_SIZE: f32 = 10.18;
     const WAVE_LENGTH: f32 = 8.5;
 
@@ -50,6 +50,7 @@ pub fn main() {
         scarlet::colormap::ListedColorMap::inferno(),
     );
     settings.color_scale = 0.6;
+    settings.slice_alpha = 0.95;
 
     let source_viewer = SoundSourceViewer::new();
     let mut acoustic_field_viewer = AcousticFiledSliceViewer::new();

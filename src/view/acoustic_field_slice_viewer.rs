@@ -17,10 +17,11 @@ use camera_controllers::model_view_projection;
 use gfx::format;
 use gfx::handle::{Buffer, DepthStencilView, RenderTargetView, ShaderResourceView};
 use gfx::preset::depth;
+use gfx::state::{Blend, ColorMask};
 use gfx::texture::{FilterMethod, SamplerInfo, WrapMode};
 use gfx::texture::{Kind, Mipmap};
 use gfx::traits::*;
-use gfx::{DepthTarget, Global, PipelineState, RenderTarget, Slice, TextureSampler, VertexBuffer};
+use gfx::{BlendTarget, DepthTarget, Global, PipelineState, Slice, TextureSampler, VertexBuffer};
 use gfx_device_gl::Resources;
 use piston_window::*;
 use scarlet::color::RGBColor;
@@ -48,6 +49,15 @@ impl Vertex {
     }
 }
 
+fn alpha_blender() -> Blend {
+    use gfx::state::{BlendValue, Equation, Factor};
+    Blend::new(
+        Equation::Add,
+        Factor::ZeroPlus(BlendValue::SourceAlpha),
+        Factor::OneMinus(BlendValue::SourceAlpha),
+    )
+}
+
 gfx_pipeline!( pipe {
     vertex_buffer: VertexBuffer<Vertex> = (),
     u_model_view_proj: Global<[[f32; 4]; 4]> = "u_model_view_proj",
@@ -60,7 +70,7 @@ gfx_pipeline!( pipe {
     u_trans_pos_256: TextureSampler<[f32; 4]> = "u_trans_pos_256",
     u_trans_pos_sub: TextureSampler<[f32; 4]> = "u_trans_pos_sub",
     u_trans_phase: TextureSampler<[f32; 4]> = "u_trans_phase",
-    out_color: RenderTarget<format::Srgba8> = "o_Color",
+    out_color: BlendTarget<format::Srgba8> = ("o_Color", ColorMask::all(), alpha_blender()),
     out_depth: DepthTarget<format::DepthStencil> = depth::LESS_EQUAL_WRITE,
 });
 
@@ -183,19 +193,17 @@ impl AcousticFiledSliceViewer {
                         .borrow()
                         .field_color_map
                         .transform(iter);
+                    let alpha = self.settings.upgrade().unwrap().borrow().slice_alpha;
                     AcousticFiledSliceViewer::update_color_map_texture(
                         data,
                         &mut window.factory,
                         &colors,
+                        alpha,
                     );
                     data.u_color_scale = self.settings.upgrade().unwrap().borrow().color_scale;
                     self.colomap_updated = false;
                 }
 
-                window
-                    .encoder
-                    .clear(&window.output_color, [0.3, 0.3, 0.3, 1.0]);
-                window.encoder.clear_depth(&window.output_stencil, 1.0);
                 data.u_model = self.model;
                 data.u_model_view_proj = model_view_projection(self.model, view, projection);
                 if let Some(pso_slice) = &self.pso_slice {
@@ -236,6 +244,7 @@ impl AcousticFiledSliceViewer {
         data: &mut pipe::Data<gfx_device_gl::Resources>,
         factory: &mut gfx_device_gl::Factory,
         colors: &[RGBColor],
+        alpha: f32,
     ) {
         let sampler_info = SamplerInfo::new(FilterMethod::Scale, WrapMode::Tile);
         let mut texels = Vec::with_capacity(colors.len());
@@ -244,7 +253,7 @@ impl AcousticFiledSliceViewer {
                 (color.r * 255.) as u8,
                 (color.g * 255.) as u8,
                 (color.b * 255.) as u8,
-                0x00,
+                (alpha * 255.) as u8,
             ]);
         }
         let (_, texture_view) = factory
