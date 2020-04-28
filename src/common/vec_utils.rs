@@ -93,3 +93,33 @@ pub fn mat4_rot(rot: Quaterion) -> Matrix4 {
         [0., 0., 0., 1.],
     ]
 }
+
+pub fn quaternion_to(vec: Vector3, to: Vector3) -> Quaterion {
+    let a = vecmath::vec3_normalized(vec);
+    let b = vecmath::vec3_normalized(to);
+
+    let c = vecmath::vec3_cross(b, a);
+    let c = vecmath::vec3_normalized(c);
+    if !vec3_is_valid(c) {
+        return (1.0, [0.0, 0.0, 0.0]);
+    }
+
+    let eps = 1e-4;
+    let ip = vecmath::vec3_dot(a, b);
+    if vecmath::vec3_len(c) < eps || 1.0 < ip {
+        if ip < (eps - 1.0) {
+            let a2 = [-a[1], a[2], a[0]];
+            let c = vecmath::vec3_normalized(vecmath::vec3_cross(a2, a));
+            (0.0, c)
+        } else {
+            (1.0, [0.0, 0.0, 0.0])
+        }
+    } else {
+        let e = vecmath::vec3_scale(c, (0.5 * (1.0 - ip)).sqrt());
+        ((0.5 * (1.0 + ip)).sqrt(), e)
+    }
+}
+
+pub fn vec3_is_valid(v: Vector3) -> bool {
+    !v[0].is_nan() && !v[1].is_nan() && !v[2].is_nan()
+}

@@ -28,6 +28,9 @@ use piston_window::*;
 use shader_version::glsl::GLSL;
 use shader_version::Shaders;
 
+use std::cell::RefCell;
+use std::rc::Weak;
+
 use crate::sound_source::SoundSource;
 use crate::vec_utils;
 use crate::vec_utils::Matrix4;
@@ -66,8 +69,8 @@ gfx_pipeline!( pipe {
 });
 
 pub struct SoundSourceViewer {
-    pub sources: Vec<SoundSource>,
-    settings: ViewerSettings,
+    pub(crate) sources: Weak<RefCell<Vec<SoundSource>>>,
+    pub(crate) settings: Weak<RefCell<ViewerSettings>>,
     pipe_data_list: Vec<pipe::Data<Resources>>,
     pso_slice: Option<(PipelineState<Resources, pipe::Meta>, Slice<Resources>)>,
     models: Vec<Matrix4>,
@@ -75,14 +78,13 @@ pub struct SoundSourceViewer {
 }
 
 impl SoundSourceViewer {
-    pub fn new(sources: &[SoundSource], settings: ViewerSettings) -> SoundSourceViewer {
-        let models = SoundSourceViewer::model_matrices_from_sources(sources, &settings);
+    pub fn new() -> SoundSourceViewer {
         SoundSourceViewer {
-            sources: sources.to_vec(),
-            settings,
+            sources: Weak::new(),
+            settings: Weak::new(),
             pipe_data_list: vec![],
             pso_slice: None,
-            models,
+            models: vec![],
             position_updated: true,
         }
     }
@@ -122,20 +124,31 @@ impl SoundSourceViewer {
         );
 
         self.update_phase();
+        self.update_position();
+    }
+
+    pub(crate) fn init_model(&mut self) {
+        let len = self.sources.upgrade().unwrap().borrow().len();
+        let s = 0.5 * self.settings.upgrade().unwrap().borrow().source_size;
+        self.models = vec![vec_utils::mat4_scale(s); len];
+        self.update_position();
     }
 
     pub fn update_position(&mut self) {
-        for (i, source) in self.sources.iter().enumerate() {
+        for (i, source) in self.sources.upgrade().unwrap().borrow().iter().enumerate() {
             self.models[i][3][0] = source.pos[0];
             self.models[i][3][1] = source.pos[1];
             self.models[i][3][2] = source.pos[2];
+            let rot = vec_utils::quaternion_to([0., 0., 1.], source.dir);
+            let rotm = vec_utils::mat4_rot(rot);
+            self.models[i] = vecmath::col_mat4_mul(self.models[i], rotm);
         }
         self.position_updated = true;
     }
 
     pub fn update_phase(&mut self) {
-        let coloring_method = self.settings.coloring;
-        for (i, source) in self.sources.iter().enumerate() {
+        let coloring_method = self.settings.upgrade().unwrap().borrow().trans_coloring;
+        for (i, source) in self.sources.upgrade().unwrap().borrow().iter().enumerate() {
             self.pipe_data_list[i].i_color = coloring_method(source.phase / (2.0 * PI));
         }
     }
@@ -171,18 +184,6 @@ impl SoundSourceViewer {
         }
     }
 
-    fn model_matrices_from_sources(
-        sources: &[SoundSource],
-        settings: &ViewerSettings,
-    ) -> Vec<Matrix4> {
-        let s = 0.5 * settings.source_size;
-        let mut models = Vec::with_capacity(sources.len());
-        for source in sources {
-            models.push(vec_utils::mat4_ts(source.pos, s));
-        }
-        models
-    }
-
     fn initialize_pipe_data(
         &mut self,
         factory: &mut gfx_device_gl::Factory,
@@ -201,7 +202,7 @@ impl SoundSourceViewer {
                 out_color,
                 out_depth,
             };
-            self.sources.len()
+            self.sources.upgrade().unwrap().borrow().len()
         ]
     }
 

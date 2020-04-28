@@ -1,8 +1,10 @@
 #version 150 core
 in vec3 v_gpos;
 out vec4 o_Color;
+uniform float u_color_scale;
 uniform float u_trans_size;
 uniform float u_trans_num;
+uniform sampler1D u_color_map;
 uniform sampler1D u_trans_pos;
 uniform sampler1D u_trans_pos_256;
 uniform sampler1D u_trans_pos_sub;
@@ -10,6 +12,10 @@ uniform sampler1D u_trans_phase;
 const float PI = 3.141592653589793;
 const float WAVE_LENGTH = 8.5;
 const float WAVE_NUM = 2.0*PI/WAVE_LENGTH;
+vec4 coloring(float t)
+{
+  return texture(u_color_map, clamp(t * u_color_scale, 0.0, 1.0));
+}
 void main() {
     float re = 0.0;
     float im = 0.0;
@@ -26,6 +32,6 @@ void main() {
         im += cos(p - WAVE_NUM*d) / d;
         re += sin(p - WAVE_NUM*d) / d;
     }
-    float c = re*re + im*im;
-    o_Color = vec4(c, 0.0, 0.0, 0.0);
+    float c = sqrt(re*re + im*im);
+    o_Color = coloring(c);
 }
