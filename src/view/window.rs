@@ -151,13 +151,13 @@ where
                     .encoder
                     .clear(&window.output_color, [0.3, 0.3, 0.3, 1.0]);
                 window.encoder.clear_depth(&window.output_stencil, 1.0);
-                update_handler.field_slice_viewer.renderer(
+                update_handler.sound_source_viewer.renderer(
                     window,
                     &e,
                     camera.orthogonal(),
                     projection,
                 );
-                update_handler.sound_source_viewer.renderer(
+                update_handler.field_slice_viewer.renderer(
                     window,
                     &e,
                     camera.orthogonal(),

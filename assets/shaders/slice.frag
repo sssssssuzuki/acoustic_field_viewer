@@ -14,7 +14,7 @@ const float WAVE_LENGTH = 8.5;
 const float WAVE_NUM = 2.0*PI/WAVE_LENGTH;
 vec4 coloring(float t)
 {
-  return texture(u_color_map, clamp(t * u_color_scale, 0.0, 1.0));
+  return texture(u_color_map, clamp(t * u_color_scale, 0.0, 0.99));
 }
 void main() {
     float re = 0.0;
