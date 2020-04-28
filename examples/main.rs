@@ -24,18 +24,18 @@ use acoustic_field_viewer::view::{
 };
 
 pub fn main() {
-    const NUM_TRANS_X: usize = 18;
-    const NUM_TRANS_Y: usize = 14;
-    const TRANS_SZIE: f32 = 10.18;
+    const NUM_TRANS_X: usize = 36;
+    const NUM_TRANS_Y: usize = 28;
+    const TRANS_SIZE: f32 = 10.18;
     const WAVE_LENGTH: f32 = 8.5;
 
-    let mut focal_pos = [TRANS_SZIE * 8.5, TRANS_SZIE * 6.5, 150.];
+    let mut focal_pos = [TRANS_SIZE * 8.5, TRANS_SIZE * 6.5, 150.];
 
     let mut transducers = Vec::new();
     let zdir = [0., 0., 1.];
     for y in 0..NUM_TRANS_Y {
         for x in 0..NUM_TRANS_X {
-            let pos = [TRANS_SZIE * x as f32, TRANS_SZIE * y as f32, 0.];
+            let pos = [TRANS_SIZE * x as f32, TRANS_SIZE * y as f32, 0.];
             let d = vec_utils::dist(pos, focal_pos);
             let phase = (d % WAVE_LENGTH) / WAVE_LENGTH;
             let phase = 2.0 * PI * phase;
@@ -45,7 +45,7 @@ pub fn main() {
 
     let mut settings = ViewerSettings::new(
         40e3,
-        TRANS_SZIE,
+        TRANS_SIZE,
         coloring_hsv,
         scarlet::colormap::ListedColorMap::inferno(),
     );
@@ -89,12 +89,10 @@ pub fn main() {
             Some(Button::Keyboard(Key::C)) => {
                 update_handler.settings.borrow_mut().color_scale += 0.1;
                 update_handler.field_slice_viewer.update_color_map();
-                dbg!(update_handler.settings.borrow().color_scale);
             }
             Some(Button::Keyboard(Key::V)) => {
                 update_handler.settings.borrow_mut().color_scale -= 0.1;
                 update_handler.field_slice_viewer.update_color_map();
-                dbg!(update_handler.settings.borrow().color_scale);
             }
             Some(Button::Keyboard(Key::G)) => {
                 focal_pos = vecmath::vec3_add(focal_pos, [travel, 0., 0.]);
