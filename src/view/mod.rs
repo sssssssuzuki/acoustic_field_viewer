@@ -20,4 +20,5 @@ mod window;
 pub use acoustic_field_slice_viewer::AcousticFiledSliceViewer;
 pub use setting::ViewerSettings;
 pub use sound_source_viewer::SoundSourceViewer;
+pub use window::UpdateHandler;
 pub use window::ViewWindow;

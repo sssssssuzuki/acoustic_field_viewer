@@ -20,7 +20,7 @@ use acoustic_field_viewer::sound_source::SoundSource;
 use acoustic_field_viewer::vec_utils;
 use acoustic_field_viewer::view::event::*;
 use acoustic_field_viewer::view::{
-    AcousticFiledSliceViewer, SoundSourceViewer, ViewWindow, ViewerSettings,
+    AcousticFiledSliceViewer, SoundSourceViewer, UpdateHandler, ViewWindow, ViewerSettings,
 };
 
 pub fn main() {
@@ -39,39 +39,62 @@ pub fn main() {
             let d = vec_utils::dist(pos, focal_pos);
             let phase = (d % WAVE_LENGTH) / WAVE_LENGTH;
             let phase = 2.0 * PI * phase;
-
             transducers.push(SoundSource::new(pos, zdir, phase));
         }
     }
 
-    let settings = ViewerSettings::new(40e3, TRANS_SZIE, coloring_hsv);
-    let source_viewer = SoundSourceViewer::new(&transducers, settings);
+    let mut settings = ViewerSettings::new(
+        40e3,
+        TRANS_SZIE,
+        coloring_hsv,
+        scarlet::colormap::ListedColorMap::inferno(),
+    );
+    settings.color_scale = 0.6;
 
-    let mut acoustic_field_viewer = AcousticFiledSliceViewer::new(&transducers, settings);
+    let source_viewer = SoundSourceViewer::new();
+    let mut acoustic_field_viewer = AcousticFiledSliceViewer::new();
     acoustic_field_viewer.translate(focal_pos);
 
-    let update = |source_view: &mut SoundSourceViewer,
-                  field_view: &mut AcousticFiledSliceViewer,
-                  button: Option<Button>| {
-        let travel = 2.0;
+    let update = |update_handler: &mut UpdateHandler, button: Option<Button>| {
+        let travel = 5.0;
         match button {
             Some(Button::Keyboard(Key::Up)) => {
-                field_view.translate([0., 0., travel]);
+                update_handler
+                    .field_slice_viewer
+                    .translate([0., 0., travel]);
             }
             Some(Button::Keyboard(Key::Down)) => {
-                field_view.translate([0., 0., -travel]);
+                update_handler
+                    .field_slice_viewer
+                    .translate([0., 0., -travel]);
             }
             Some(Button::Keyboard(Key::Left)) => {
-                field_view.translate([-travel, 0., 0.]);
+                update_handler
+                    .field_slice_viewer
+                    .translate([-travel, 0., 0.]);
             }
             Some(Button::Keyboard(Key::Right)) => {
-                field_view.translate([travel, 0., 0.]);
+                update_handler
+                    .field_slice_viewer
+                    .translate([travel, 0., 0.]);
             }
             Some(Button::Keyboard(Key::Z)) => {
-                field_view.rotate([0., 0., 1.], 0.05);
+                update_handler.field_slice_viewer.rotate([0., 0., 1.], 0.05);
             }
             Some(Button::Keyboard(Key::X)) => {
-                field_view.rotate([0., 0., 1.], -0.05);
+                update_handler
+                    .field_slice_viewer
+                    .rotate([0., 0., 1.], -0.05);
+            }
+            Some(Button::Keyboard(Key::C)) => {
+                update_handler.settings.borrow_mut().color_scale += 0.1;
+                update_handler.field_slice_viewer.update_color_map();
+                dbg!(update_handler.settings.borrow().color_scale);
+            }
+            Some(Button::Keyboard(Key::V)) => {
+                update_handler.settings.borrow_mut().color_scale -= 0.1;
+                update_handler.field_slice_viewer.update_color_map();
+                dbg!(update_handler.settings.borrow().color_scale);
             }
             Some(Button::Keyboard(Key::G)) => {
                 focal_pos = vecmath::vec3_add(focal_pos, [travel, 0., 0.]);
@@ -79,17 +102,15 @@ pub fn main() {
                     let d = vecmath::vec3_sub(l, r);
                     vecmath::vec3_dot(d, d).sqrt()
                 };
-                for i in 0..transducers.len() {
-                    let pos = source_view.sources[i].pos;
+                for source in update_handler.sources.borrow_mut().iter_mut() {
+                    let pos = source.pos;
                     let d = dist(pos, focal_pos);
                     let phase = (d % WAVE_LENGTH) / WAVE_LENGTH;
                     let phase = 2.0 * PI * phase;
 
-                    source_view.sources[i].phase = phase;
-                    field_view.sources[i].phase = phase;
-                    source_view.update_phase();
-                    field_view.update_source_phase();
+                    source.phase = phase;
                 }
+                update_handler.update_source_phase();
             }
             Some(Button::Keyboard(Key::F)) => {
                 focal_pos = vecmath::vec3_add(focal_pos, [-travel, 0., 0.]);
@@ -97,23 +118,21 @@ pub fn main() {
                     let d = vecmath::vec3_sub(l, r);
                     vecmath::vec3_dot(d, d).sqrt()
                 };
-                for i in 0..transducers.len() {
-                    let pos = source_view.sources[i].pos;
+                for source in update_handler.sources.borrow_mut().iter_mut() {
+                    let pos = source.pos;
                     let d = dist(pos, focal_pos);
                     let phase = (d % WAVE_LENGTH) / WAVE_LENGTH;
                     let phase = 2.0 * PI * phase;
 
-                    source_view.sources[i].phase = phase;
-                    field_view.sources[i].phase = phase;
-                    source_view.update_phase();
-                    field_view.update_source_phase();
+                    source.phase = phase;
                 }
+                update_handler.update_source_phase();
             }
             _ => (),
         }
     };
 
-    let mut window = ViewWindow::new(source_viewer, acoustic_field_viewer);
+    let mut window = ViewWindow::new(transducers, source_viewer, acoustic_field_viewer, settings);
     window.update = Some(update);
     window.start();
 }

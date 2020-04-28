@@ -23,8 +23,13 @@ use gfx::traits::*;
 use gfx::{DepthTarget, Global, PipelineState, RenderTarget, Slice, TextureSampler, VertexBuffer};
 use gfx_device_gl::Resources;
 use piston_window::*;
+use scarlet::color::RGBColor;
+use scarlet::colormap::ColorMap;
 use shader_version::glsl::GLSL;
 use shader_version::Shaders;
+
+use std::cell::RefCell;
+use std::rc::Weak;
 
 use crate::sound_source::SoundSource;
 use crate::vec_utils;
@@ -48,6 +53,8 @@ gfx_pipeline!( pipe {
     u_model_view_proj: Global<[[f32; 4]; 4]> = "u_model_view_proj",
     u_model: Global<[[f32; 4]; 4]> = "u_model",
     u_trans_size : Global<f32> = "u_trans_size",
+    u_color_scale : Global<f32> = "u_color_scale",
+    u_color_map: TextureSampler<[f32; 4]> = "u_color_map",
     u_trans_num : Global<f32> = "u_trans_num",
     u_trans_pos: TextureSampler<[f32; 4]> = "u_trans_pos",
     u_trans_pos_256: TextureSampler<[f32; 4]> = "u_trans_pos_256",
@@ -58,25 +65,27 @@ gfx_pipeline!( pipe {
 });
 
 pub struct AcousticFiledSliceViewer {
-    settings: ViewerSettings,
+    pub(crate) settings: Weak<RefCell<ViewerSettings>>,
+    pub(crate) sources: Weak<RefCell<Vec<SoundSource>>>,
     pipe_data: Option<pipe::Data<Resources>>,
-    pub sources: Vec<SoundSource>,
     model: Matrix4,
     pso_slice: Option<(PipelineState<Resources, pipe::Meta>, Slice<Resources>)>,
     position_updated: bool,
     phase_updated: bool,
+    colomap_updated: bool,
 }
 
 impl AcousticFiledSliceViewer {
-    pub fn new(sources: &[SoundSource], settings: ViewerSettings) -> AcousticFiledSliceViewer {
+    pub fn new() -> AcousticFiledSliceViewer {
         AcousticFiledSliceViewer {
-            settings,
+            settings: Weak::new(),
             pipe_data: None,
-            sources: sources.to_vec(),
+            sources: Weak::new(),
             model: vec_utils::mat4_scale(150.),
             pso_slice: None,
             position_updated: false,
             phase_updated: false,
+            colomap_updated: false,
         }
     }
 
@@ -96,7 +105,8 @@ impl AcousticFiledSliceViewer {
         let glsl = opengl.to_glsl();
         self.initialize_shader(factory, glsl, slice);
 
-        let phase_view = AcousticFiledSliceViewer::generate_empty_view(factory, self.sources.len());
+        let len = self.sources.upgrade().unwrap().borrow().len();
+        let phase_view = AcousticFiledSliceViewer::generate_empty_view(factory, len);
 
         self.initialize_pipe_data(
             factory,
@@ -108,6 +118,7 @@ impl AcousticFiledSliceViewer {
 
         self.update_source_pos();
         self.update_source_phase();
+        self.update_color_map();
     }
 
     pub fn update_source_pos(&mut self) {
@@ -116,6 +127,10 @@ impl AcousticFiledSliceViewer {
 
     pub fn update_source_phase(&mut self) {
         self.phase_updated = true;
+    }
+
+    pub fn update_color_map(&mut self) {
+        self.colomap_updated = true;
     }
 
     pub fn translate(&mut self, travel: Vector3) {
@@ -143,19 +158,38 @@ impl AcousticFiledSliceViewer {
                     AcousticFiledSliceViewer::update_phase_texture(
                         data,
                         &mut window.factory,
-                        &self.sources,
+                        &self.sources.upgrade().unwrap().borrow(),
                     );
                     self.phase_updated = false;
                 }
 
                 if self.position_updated {
+                    let source_size = self.settings.upgrade().unwrap().borrow().source_size;
                     AcousticFiledSliceViewer::update_position_texture(
                         data,
                         &mut window.factory,
-                        &self.sources,
-                        self.settings.source_size,
+                        &self.sources.upgrade().unwrap().borrow(),
+                        source_size,
                     );
                     self.position_updated = false;
+                }
+
+                if self.colomap_updated {
+                    let iter = (0..100).map(|x| x as f64 / 100.0);
+                    let colors = self
+                        .settings
+                        .upgrade()
+                        .unwrap()
+                        .borrow()
+                        .field_color_map
+                        .transform(iter);
+                    AcousticFiledSliceViewer::update_color_map_texture(
+                        data,
+                        &mut window.factory,
+                        &colors,
+                    );
+                    data.u_color_scale = self.settings.upgrade().unwrap().borrow().color_scale;
+                    self.colomap_updated = false;
                 }
 
                 window
@@ -196,6 +230,31 @@ impl AcousticFiledSliceViewer {
             )
             .unwrap();
         data.u_trans_phase = (texture_view, factory.create_sampler(sampler_info));
+    }
+
+    fn update_color_map_texture(
+        data: &mut pipe::Data<gfx_device_gl::Resources>,
+        factory: &mut gfx_device_gl::Factory,
+        colors: &[RGBColor],
+    ) {
+        let sampler_info = SamplerInfo::new(FilterMethod::Scale, WrapMode::Tile);
+        let mut texels = Vec::with_capacity(colors.len());
+        for color in colors {
+            texels.push([
+                (color.r * 255.) as u8,
+                (color.g * 255.) as u8,
+                (color.b * 255.) as u8,
+                0x00,
+            ]);
+        }
+        let (_, texture_view) = factory
+            .create_texture_immutable::<format::Rgba8>(
+                Kind::D1(colors.len() as u16),
+                Mipmap::Provided,
+                &[&texels],
+            )
+            .unwrap();
+        data.u_color_map = (texture_view, factory.create_sampler(sampler_info));
     }
 
     fn update_position_texture(
@@ -259,22 +318,29 @@ impl AcousticFiledSliceViewer {
         out_depth: DepthStencilView<Resources, (format::D24_S8, format::Unorm)>,
     ) {
         let sampler_info = SamplerInfo::new(FilterMethod::Scale, WrapMode::Tile);
+        let len = self.sources.upgrade().unwrap().borrow().len();
+        let source_size = self.settings.upgrade().unwrap().borrow().source_size;
         self.pipe_data = Some(pipe::Data {
             vertex_buffer,
             u_model_view_proj: [[0.; 4]; 4],
             u_model: vecmath::mat4_id(),
-            u_trans_size: self.settings.source_size,
-            u_trans_num: (self.sources.len()) as f32,
+            u_color_scale: 1.0,
+            u_trans_size: source_size,
+            u_trans_num: len as f32,
+            u_color_map: (
+                AcousticFiledSliceViewer::generate_empty_view(factory, len),
+                factory.create_sampler(SamplerInfo::new(FilterMethod::Bilinear, WrapMode::Clamp)),
+            ),
             u_trans_pos: (
-                AcousticFiledSliceViewer::generate_empty_view(factory, self.sources.len()),
+                AcousticFiledSliceViewer::generate_empty_view(factory, len),
                 factory.create_sampler(sampler_info),
             ),
             u_trans_pos_256: (
-                AcousticFiledSliceViewer::generate_empty_view(factory, self.sources.len()),
+                AcousticFiledSliceViewer::generate_empty_view(factory, len),
                 factory.create_sampler(sampler_info),
             ),
             u_trans_pos_sub: (
-                AcousticFiledSliceViewer::generate_empty_view(factory, self.sources.len()),
+                AcousticFiledSliceViewer::generate_empty_view(factory, len),
                 factory.create_sampler(sampler_info),
             ),
             u_trans_phase: (phase_view, factory.create_sampler(sampler_info)),

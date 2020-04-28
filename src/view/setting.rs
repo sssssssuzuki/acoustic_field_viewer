@@ -12,22 +12,32 @@
  */
 
 use crate::common::coloring_method::ColoringMethod;
+use scarlet::colormap::ListedColorMap;
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone)]
 pub struct ViewerSettings {
-    pub(crate) freqency: f32,
-    pub(crate) source_size: f32,
-    pub(crate) wave_length: f32,
-    pub(crate) coloring: ColoringMethod,
+    pub freqency: f32,
+    pub source_size: f32,
+    pub wave_length: f32,
+    pub trans_coloring: ColoringMethod,
+    pub field_color_map: ListedColorMap,
+    pub color_scale: f32,
 }
 
 impl ViewerSettings {
-    pub fn new(freqency: f32, source_size: f32, coloring: ColoringMethod) -> ViewerSettings {
+    pub fn new(
+        freqency: f32,
+        source_size: f32,
+        trans_coloring: ColoringMethod,
+        field_color_map: ListedColorMap,
+    ) -> ViewerSettings {
         ViewerSettings {
             freqency,
             source_size,
             wave_length: 340e3 / freqency,
-            coloring,
+            trans_coloring,
+            field_color_map,
+            color_scale: 1.0,
         }
     }
 }

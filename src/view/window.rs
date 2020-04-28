@@ -11,20 +11,70 @@
  *
  */
 
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use camera_controllers::{Camera, CameraPerspective, FirstPerson, FirstPersonSettings};
 use piston_window::Window;
 use piston_window::*;
 
+use crate::sound_source::SoundSource;
 use crate::vec_utils::Matrix4;
-use crate::view::{AcousticFiledSliceViewer, SoundSourceViewer};
+use crate::view::{AcousticFiledSliceViewer, SoundSourceViewer, ViewerSettings};
+
+pub struct UpdateHandler {
+    update_source_pos: bool,
+    update_source_phase: bool,
+    pub sound_source_viewer: SoundSourceViewer,
+    pub field_slice_viewer: AcousticFiledSliceViewer,
+    pub sources: Rc<RefCell<Vec<SoundSource>>>,
+    pub settings: Rc<RefCell<ViewerSettings>>,
+}
+
+impl UpdateHandler {
+    fn new(
+        sources: Rc<RefCell<Vec<SoundSource>>>,
+        sound_source_viewer: SoundSourceViewer,
+        field_slice_viewer: AcousticFiledSliceViewer,
+        settings: Rc<RefCell<ViewerSettings>>,
+    ) -> UpdateHandler {
+        UpdateHandler {
+            update_source_phase: false,
+            update_source_pos: false,
+            sound_source_viewer,
+            field_slice_viewer,
+            sources,
+            settings,
+        }
+    }
+
+    fn update_sources(&mut self) {
+        if self.update_source_phase {
+            self.sound_source_viewer.update_phase();
+            self.field_slice_viewer.update_source_phase();
+            self.update_source_phase = false;
+        }
+        if self.update_source_pos {
+            self.sound_source_viewer.update_position();
+            self.field_slice_viewer.update_source_pos();
+            self.update_source_pos = false;
+        }
+    }
+
+    pub fn update_source_phase(&mut self) {
+        self.update_source_phase = true;
+    }
+    pub fn update_source_pos(&mut self) {
+        self.update_source_pos = true;
+    }
+}
 
 pub struct ViewWindow<F>
 where
-    F: FnMut(&mut SoundSourceViewer, &mut AcousticFiledSliceViewer, Option<Button>) -> (),
+    F: FnMut(&mut UpdateHandler, Option<Button>) -> (),
 {
     pub update: Option<F>,
-    sound_source_viewer: SoundSourceViewer,
-    field_slice_viewer: AcousticFiledSliceViewer,
+    update_handler: UpdateHandler,
     projection: Matrix4,
     camera: Camera<f32>,
     window: PistonWindow,
@@ -32,11 +82,13 @@ where
 
 impl<F> ViewWindow<F>
 where
-    F: FnMut(&mut SoundSourceViewer, &mut AcousticFiledSliceViewer, Option<Button>) -> (),
+    F: FnMut(&mut UpdateHandler, Option<Button>) -> (),
 {
     pub fn new(
+        sources: Vec<SoundSource>,
         sound_source_viewer: SoundSourceViewer,
         field_slice_viewer: AcousticFiledSliceViewer,
+        settings: ViewerSettings,
     ) -> ViewWindow<F> {
         let opengl = OpenGL::V3_2;
         let mut window: PistonWindow = WindowSettings::new("", [640, 480])
@@ -54,15 +106,28 @@ where
         camera.set_yaw_pitch(0., -std::f32::consts::PI / 2.0);
 
         let mut sound_source_viewer = sound_source_viewer;
-        sound_source_viewer.render_setting(&window, opengl);
-
         let mut field_slice_viewer = field_slice_viewer;
+
+        let ref_sources = Rc::new(RefCell::new(sources));
+        sound_source_viewer.sources = Rc::downgrade(&ref_sources);
+        field_slice_viewer.sources = Rc::downgrade(&ref_sources);
+
+        let ref_settings = Rc::new(RefCell::new(settings));
+        sound_source_viewer.settings = Rc::downgrade(&ref_settings);
+        field_slice_viewer.settings = Rc::downgrade(&ref_settings);
+
+        sound_source_viewer.init_model();
         field_slice_viewer.render_setting(&window, opengl);
+        sound_source_viewer.render_setting(&window, opengl);
 
         ViewWindow {
             update: None,
-            sound_source_viewer,
-            field_slice_viewer,
+            update_handler: UpdateHandler::new(
+                ref_sources,
+                sound_source_viewer,
+                field_slice_viewer,
+                ref_settings,
+            ),
             projection,
             camera,
             window,
@@ -71,18 +136,14 @@ where
 
     pub fn start(self) {
         let mut window = self.window;
-        let mut sound_source_viewer = self.sound_source_viewer;
-        let mut field_slice_viewer = self.field_slice_viewer;
         let mut update = self.update;
         let camera = self.camera;
         let mut projection = self.projection;
+        let mut update_handler = self.update_handler;
         while let Some(e) = window.next() {
             if let Some(update_fn) = &mut update {
-                update_fn(
-                    &mut sound_source_viewer,
-                    &mut field_slice_viewer,
-                    e.press_args(),
-                );
+                update_fn(&mut update_handler, e.press_args());
+                update_handler.update_sources();
             }
 
             window.draw_3d(&e, |window| {
@@ -90,8 +151,18 @@ where
                     .encoder
                     .clear(&window.output_color, [0.3, 0.3, 0.3, 1.0]);
                 window.encoder.clear_depth(&window.output_stencil, 1.0);
-                field_slice_viewer.renderer(window, &e, camera.orthogonal(), projection);
-                sound_source_viewer.renderer(window, &e, camera.orthogonal(), projection);
+                update_handler.field_slice_viewer.renderer(
+                    window,
+                    &e,
+                    camera.orthogonal(),
+                    projection,
+                );
+                update_handler.sound_source_viewer.renderer(
+                    window,
+                    &e,
+                    camera.orthogonal(),
+                    projection,
+                );
             });
             if e.resize_args().is_some() {
                 projection = ViewWindow::<F>::get_projection(&window);
