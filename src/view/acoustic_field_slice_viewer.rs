@@ -4,7 +4,7 @@
  * Created Date: 27/04/2020
  * Author: Shun Suzuki
  * -----
- * Last Modified: 27/04/2020
+ * Last Modified: 28/04/2020
  * Modified By: Shun Suzuki (suzuki@hapis.k.u-tokyo.ac.jp)
  * -----
  * Copyright (c) 2020 Hapis Lab. All rights reserved.
@@ -18,6 +18,7 @@ use gfx::format;
 use gfx::handle::{Buffer, DepthStencilView, RenderTargetView, ShaderResourceView};
 use gfx::preset::depth;
 use gfx::texture::{FilterMethod, SamplerInfo, WrapMode};
+use gfx::texture::{Kind, Mipmap};
 use gfx::traits::*;
 use gfx::{DepthTarget, Global, PipelineState, RenderTarget, Slice, TextureSampler, VertexBuffer};
 use gfx_device_gl::Resources;
@@ -28,6 +29,7 @@ use shader_version::Shaders;
 use crate::sound_source::SoundSource;
 use crate::vec_utils;
 use crate::vec_utils::{Matrix4, Vector3};
+use crate::view::ViewerSettings;
 
 gfx_vertex_struct!(Vertex {
     a_pos: [i8; 4] = "a_pos",
@@ -47,17 +49,18 @@ gfx_pipeline!( pipe {
     u_model: Global<[[f32; 4]; 4]> = "u_model",
     u_trans_size : Global<f32> = "u_trans_size",
     u_trans_num : Global<f32> = "u_trans_num",
-    u_trans_pos_x: TextureSampler<[f32; 4]> = "u_trans_pos_x",
-    u_trans_pos_y: TextureSampler<[f32; 4]> = "u_trans_pos_y",
-    u_trans_pos_z: TextureSampler<[f32; 4]> = "u_trans_pos_z",
+    u_trans_pos: TextureSampler<[f32; 4]> = "u_trans_pos",
+    u_trans_pos_256: TextureSampler<[f32; 4]> = "u_trans_pos_256",
+    u_trans_pos_sub: TextureSampler<[f32; 4]> = "u_trans_pos_sub",
     u_trans_phase: TextureSampler<[f32; 4]> = "u_trans_phase",
     out_color: RenderTarget<format::Srgba8> = "o_Color",
     out_depth: DepthTarget<format::DepthStencil> = depth::LESS_EQUAL_WRITE,
 });
 
 pub struct AcousticFiledSliceViewer {
+    settings: ViewerSettings,
     pipe_data: Option<pipe::Data<Resources>>,
-    sources: Vec<SoundSource>,
+    pub sources: Vec<SoundSource>,
     model: Matrix4,
     pso_slice: Option<(PipelineState<Resources, pipe::Meta>, Slice<Resources>)>,
     position_updated: bool,
@@ -65,8 +68,9 @@ pub struct AcousticFiledSliceViewer {
 }
 
 impl AcousticFiledSliceViewer {
-    pub fn new(sources: &[SoundSource]) -> AcousticFiledSliceViewer {
+    pub fn new(sources: &[SoundSource], settings: ViewerSettings) -> AcousticFiledSliceViewer {
         AcousticFiledSliceViewer {
+            settings,
             pipe_data: None,
             sources: sources.to_vec(),
             model: vec_utils::mat4_scale(150.),
@@ -92,17 +96,7 @@ impl AcousticFiledSliceViewer {
         let glsl = opengl.to_glsl();
         self.initialize_shader(factory, glsl, slice);
 
-        let mut texels = Vec::with_capacity(self.sources.len());
-        for _ in 0..self.sources.len() {
-            texels.push([0x00, 0x00, 0x00, 0x00]);
-        }
-        let (_, phase_view) = factory
-            .create_texture_immutable::<gfx::format::Rgba8>(
-                gfx::texture::Kind::D1(self.sources.len() as u16),
-                gfx::texture::Mipmap::Provided,
-                &[&texels],
-            )
-            .unwrap();
+        let phase_view = AcousticFiledSliceViewer::generate_empty_view(factory, self.sources.len());
 
         self.initialize_pipe_data(
             factory,
@@ -130,33 +124,9 @@ impl AcousticFiledSliceViewer {
         self.model[3][2] += travel[2];
     }
 
-    pub fn rotate(&mut self, rot: f32) {
-        let rot = quaternion::axis_angle([0.0, 0., 1.], rot);
-        let x = rot.1[0];
-        let y = rot.1[1];
-        let z = rot.1[2];
-        let w = rot.0;
-        let rotm = [
-            [
-                1. - 2. * y * y,
-                2. * x * y + 2. * w * z,
-                2. * x * z - 2. * w * y,
-                0.,
-            ],
-            [
-                2. * x * y - 2. * w * z,
-                1. - 2. * x * x - 2. * z * z,
-                2. * y * z + 2. * w * x,
-                0.,
-            ],
-            [
-                2. * x * z + 2. * w * y,
-                2. * y * z - 2. * w * x,
-                1. - 2. * x * x - 2. * y * y,
-                0.,
-            ],
-            [0., 0., 0., 1.],
-        ];
+    pub fn rotate(&mut self, axis: Vector3, rot: f32) {
+        let rot = quaternion::axis_angle(axis, rot);
+        let rotm = vec_utils::mat4_rot(rot);
         self.model = vecmath::col_mat4_mul(self.model, rotm);
     }
 
@@ -170,87 +140,24 @@ impl AcousticFiledSliceViewer {
         window.draw_3d(event, |window| {
             if let Some(data) = &mut self.pipe_data {
                 if self.phase_updated {
-                    let sampler_info = SamplerInfo::new(FilterMethod::Scale, WrapMode::Tile);
-                    use std::f32::consts::PI;
-                    let mut texels = Vec::with_capacity(self.sources.len());
-                    for source in &self.sources {
-                        texels.push([(source.phase / (2.0 * PI) * 255.) as u8, 0x00, 0x00, 0x00]);
-                    }
-                    let (_, texture_view) = window
-                        .factory
-                        .create_texture_immutable::<gfx::format::Rgba8>(
-                            gfx::texture::Kind::D1(self.sources.len() as u16),
-                            gfx::texture::Mipmap::Provided,
-                            &[&texels],
-                        )
-                        .unwrap();
-                    data.u_trans_phase =
-                        (texture_view, window.factory.create_sampler(sampler_info));
+                    AcousticFiledSliceViewer::update_phase_texture(
+                        data,
+                        &mut window.factory,
+                        &self.sources,
+                    );
                     self.phase_updated = false;
                 }
+
                 if self.position_updated {
-                    let sampler_info = SamplerInfo::new(FilterMethod::Scale, WrapMode::Tile);
-                    let mut texels = Vec::with_capacity(self.sources.len());
-                    for source in &self.sources {
-                        texels.push([
-                            ((source.pos[0] / 10.18).round() as u16 % 256) as u8,
-                            ((source.pos[0] / 10.18).round() as u16 / 256) as u8,
-                            0,
-                            0,
-                        ]);
-                    }
-                    let (_, texture_view) = window
-                        .factory
-                        .create_texture_immutable::<gfx::format::Rgba8>(
-                            gfx::texture::Kind::D1(self.sources.len() as u16),
-                            gfx::texture::Mipmap::Provided,
-                            &[&texels],
-                        )
-                        .unwrap();
-                    data.u_trans_pos_x =
-                        (texture_view, window.factory.create_sampler(sampler_info));
-
-                    let mut texels = Vec::with_capacity(self.sources.len());
-                    for source in &self.sources {
-                        texels.push([
-                            ((source.pos[1] / 10.18).round() as u16 % 256) as u8,
-                            ((source.pos[1] / 10.18).round() as u16 / 256) as u8,
-                            0,
-                            0,
-                        ]);
-                    }
-                    let (_, texture_view) = window
-                        .factory
-                        .create_texture_immutable::<gfx::format::Rgba8>(
-                            gfx::texture::Kind::D1(self.sources.len() as u16),
-                            gfx::texture::Mipmap::Provided,
-                            &[&texels],
-                        )
-                        .unwrap();
-                    data.u_trans_pos_y =
-                        (texture_view, window.factory.create_sampler(sampler_info));
-
-                    let mut texels = Vec::with_capacity(self.sources.len());
-                    for source in &self.sources {
-                        texels.push([
-                            ((source.pos[2] / 10.18).round() as u16 % 256) as u8,
-                            ((source.pos[2] / 10.18).round() as u16 / 256) as u8,
-                            0,
-                            0,
-                        ]);
-                    }
-                    let (_, texture_view) = window
-                        .factory
-                        .create_texture_immutable::<gfx::format::Rgba8>(
-                            gfx::texture::Kind::D1(self.sources.len() as u16),
-                            gfx::texture::Mipmap::Provided,
-                            &[&texels],
-                        )
-                        .unwrap();
-                    data.u_trans_pos_z =
-                        (texture_view, window.factory.create_sampler(sampler_info));
+                    AcousticFiledSliceViewer::update_position_texture(
+                        data,
+                        &mut window.factory,
+                        &self.sources,
+                        self.settings.source_size,
+                    );
                     self.position_updated = false;
                 }
+
                 window
                     .encoder
                     .clear(&window.output_color, [0.3, 0.3, 0.3, 1.0]);
@@ -269,6 +176,80 @@ impl AcousticFiledSliceViewer {
         });
     }
 
+    fn update_phase_texture(
+        data: &mut pipe::Data<gfx_device_gl::Resources>,
+        factory: &mut gfx_device_gl::Factory,
+        sources: &[SoundSource],
+    ) {
+        use std::f32::consts::PI;
+
+        let sampler_info = SamplerInfo::new(FilterMethod::Scale, WrapMode::Tile);
+        let mut texels = Vec::with_capacity(sources.len());
+        for source in sources {
+            texels.push([(source.phase / (2.0 * PI) * 255.) as u8, 0x00, 0x00, 0x00]);
+        }
+        let (_, texture_view) = factory
+            .create_texture_immutable::<format::Rgba8>(
+                Kind::D1(sources.len() as u16),
+                Mipmap::Provided,
+                &[&texels],
+            )
+            .unwrap();
+        data.u_trans_phase = (texture_view, factory.create_sampler(sampler_info));
+    }
+
+    fn update_position_texture(
+        data: &mut pipe::Data<gfx_device_gl::Resources>,
+        factory: &mut gfx_device_gl::Factory,
+        sources: &[SoundSource],
+        source_size: f32,
+    ) {
+        use format::Rgba8;
+
+        let sampler_info = SamplerInfo::new(FilterMethod::Scale, WrapMode::Tile);
+        let size = sources.len();
+        let kind = Kind::D1(size as u16);
+        let mipmap = Mipmap::Provided;
+
+        let texels: Vec<[u8; 4]> = sources
+            .iter()
+            .map(|source| {
+                let pos = vec_utils::to_vec4(source.pos);
+                vec_utils::vec4_map(pos, |p| ((p / source_size).round() as u16 % 256) as u8)
+            })
+            .collect();
+        let (_, texture_view) = factory
+            .create_texture_immutable::<Rgba8>(kind, mipmap, &[&texels])
+            .unwrap();
+        data.u_trans_pos = (texture_view, factory.create_sampler(sampler_info));
+
+        let texels: Vec<[u8; 4]> = sources
+            .iter()
+            .map(|source| {
+                let pos = vec_utils::to_vec4(source.pos);
+                vec_utils::vec4_map(pos, |p| ((p / source_size).round() as u16 / 256) as u8)
+            })
+            .collect();
+        let (_, texture_view) = factory
+            .create_texture_immutable::<Rgba8>(kind, mipmap, &[&texels])
+            .unwrap();
+        data.u_trans_pos_256 = (texture_view, factory.create_sampler(sampler_info));
+
+        let texels: Vec<[u8; 4]> = sources
+            .iter()
+            .map(|source| {
+                let pos = vec_utils::to_vec4(source.pos);
+                vec_utils::vec4_map(pos, |p| {
+                    (((p % source_size) / source_size * 256.0).round() as u16 % 256) as u8
+                })
+            })
+            .collect();
+        let (_, texture_view) = factory
+            .create_texture_immutable::<Rgba8>(kind, mipmap, &[&texels])
+            .unwrap();
+        data.u_trans_pos_sub = (texture_view, factory.create_sampler(sampler_info));
+    }
+
     fn initialize_pipe_data(
         &mut self,
         factory: &mut gfx_device_gl::Factory,
@@ -279,20 +260,20 @@ impl AcousticFiledSliceViewer {
     ) {
         let sampler_info = SamplerInfo::new(FilterMethod::Scale, WrapMode::Tile);
         self.pipe_data = Some(pipe::Data {
-            vertex_buffer: vertex_buffer,
+            vertex_buffer,
             u_model_view_proj: [[0.; 4]; 4],
             u_model: vecmath::mat4_id(),
-            u_trans_size: 10.18,
+            u_trans_size: self.settings.source_size,
             u_trans_num: (self.sources.len()) as f32,
-            u_trans_pos_x: (
+            u_trans_pos: (
                 AcousticFiledSliceViewer::generate_empty_view(factory, self.sources.len()),
                 factory.create_sampler(sampler_info),
             ),
-            u_trans_pos_y: (
+            u_trans_pos_256: (
                 AcousticFiledSliceViewer::generate_empty_view(factory, self.sources.len()),
                 factory.create_sampler(sampler_info),
             ),
-            u_trans_pos_z: (
+            u_trans_pos_sub: (
                 AcousticFiledSliceViewer::generate_empty_view(factory, self.sources.len()),
                 factory.create_sampler(sampler_info),
             ),
@@ -306,18 +287,15 @@ impl AcousticFiledSliceViewer {
         factory: &mut gfx_device_gl::Factory,
         size: usize,
     ) -> ShaderResourceView<Resources, [f32; 4]> {
-        let mut texels = Vec::with_capacity(size);
-        for _ in 0..size {
-            texels.push([0, 0, 0, 0]);
-        }
-        let (_, pos_view) = factory
-            .create_texture_immutable::<gfx::format::Rgba8>(
-                gfx::texture::Kind::D1(size as u16),
-                gfx::texture::Mipmap::Provided,
+        let texels = vec![[0, 0, 0, 0]; size];
+        let (_, view) = factory
+            .create_texture_immutable::<format::Rgba8>(
+                Kind::D1(size as u16),
+                Mipmap::Provided,
                 &[&texels],
             )
             .unwrap();
-        pos_view
+        view
     }
 
     fn initialize_shader(

@@ -4,7 +4,7 @@
  * Created Date: 27/04/2020
  * Author: Shun Suzuki
  * -----
- * Last Modified: 27/04/2020
+ * Last Modified: 28/04/2020
  * Modified By: Shun Suzuki (suzuki@hapis.k.u-tokyo.ac.jp)
  * -----
  * Copyright (c) 2020 Hapis Lab. All rights reserved.
@@ -28,9 +28,10 @@ use piston_window::*;
 use shader_version::glsl::GLSL;
 use shader_version::Shaders;
 
-use crate::sound_source::{SoundSource, SoundSourceSettings};
+use crate::sound_source::SoundSource;
 use crate::vec_utils;
 use crate::vec_utils::Matrix4;
+use crate::view::ViewerSettings;
 
 gfx_vertex_struct!(Vertex {
     a_pos: [i8; 4] = "a_pos",
@@ -65,8 +66,8 @@ gfx_pipeline!( pipe {
 });
 
 pub struct SoundSourceViewer {
-    sources: Vec<SoundSource>,
-    settings: SoundSourceSettings,
+    pub sources: Vec<SoundSource>,
+    settings: ViewerSettings,
     pipe_data_list: Vec<pipe::Data<Resources>>,
     pso_slice: Option<(PipelineState<Resources, pipe::Meta>, Slice<Resources>)>,
     models: Vec<Matrix4>,
@@ -74,7 +75,7 @@ pub struct SoundSourceViewer {
 }
 
 impl SoundSourceViewer {
-    pub fn new(sources: &[SoundSource], settings: SoundSourceSettings) -> SoundSourceViewer {
+    pub fn new(sources: &[SoundSource], settings: ViewerSettings) -> SoundSourceViewer {
         let models = SoundSourceViewer::model_matrices_from_sources(sources, &settings);
         SoundSourceViewer {
             sources: sources.to_vec(),
@@ -172,7 +173,7 @@ impl SoundSourceViewer {
 
     fn model_matrices_from_sources(
         sources: &[SoundSource],
-        settings: &SoundSourceSettings,
+        settings: &ViewerSettings,
     ) -> Vec<Matrix4> {
         let s = 0.5 * settings.source_size;
         let mut models = Vec::with_capacity(sources.len());

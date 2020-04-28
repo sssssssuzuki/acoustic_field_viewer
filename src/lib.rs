@@ -10,9 +10,10 @@ extern crate quaternion;
 extern crate rand;
 extern crate shader_version;
 
-pub mod color;
+mod common;
 pub mod sound_source;
-pub mod vec_utils;
 pub mod view;
 
-pub use vec_utils::Vector3;
+pub use common::color;
+pub use common::coloring_method;
+pub use common::vec_utils;
