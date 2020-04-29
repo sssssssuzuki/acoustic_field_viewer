@@ -4,7 +4,7 @@
  * Created Date: 27/04/2020
  * Author: Shun Suzuki
  * -----
- * Last Modified: 28/04/2020
+ * Last Modified: 29/04/2020
  * Modified By: Shun Suzuki (suzuki@hapis.k.u-tokyo.ac.jp)
  * -----
  * Copyright (c) 2020 Hapis Lab. All rights reserved.
@@ -75,6 +75,9 @@ pub struct SoundSourceViewer {
     pso_slice: Option<(PipelineState<Resources, pipe::Meta>, Slice<Resources>)>,
     models: Vec<Matrix4>,
     position_updated: bool,
+    phase_updated: bool,
+    vertex_buffer: Option<Buffer<Resources, Vertex>>,
+    view: Option<ShaderResourceView<Resources, [f32; 4]>>,
 }
 
 impl SoundSourceViewer {
@@ -86,6 +89,9 @@ impl SoundSourceViewer {
             pso_slice: None,
             models: vec![],
             position_updated: true,
+            phase_updated: true,
+            vertex_buffer: None,
+            view: None,
         }
     }
 
@@ -115,6 +121,10 @@ impl SoundSourceViewer {
             &TextureSettings::new(),
         )
         .unwrap();
+
+        self.vertex_buffer = Some(vertex_buffer.clone());
+        self.view = Some(circle.view.clone());
+
         self.initialize_pipe_data(
             factory,
             vertex_buffer,
@@ -131,10 +141,13 @@ impl SoundSourceViewer {
         let len = self.sources.upgrade().unwrap().borrow().len();
         let s = 0.5 * self.settings.upgrade().unwrap().borrow().source_size;
         self.models = vec![vec_utils::mat4_scale(s); len];
-        self.update_position();
     }
 
     pub fn update_position(&mut self) {
+        if self.models.len() != self.sources.upgrade().unwrap().borrow().len() {
+            self.init_model();
+        }
+
         for (i, source) in self.sources.upgrade().unwrap().borrow().iter().enumerate() {
             self.models[i][3][0] = source.pos[0];
             self.models[i][3][1] = source.pos[1];
@@ -147,10 +160,7 @@ impl SoundSourceViewer {
     }
 
     pub fn update_phase(&mut self) {
-        let coloring_method = self.settings.upgrade().unwrap().borrow().trans_coloring;
-        for (i, source) in self.sources.upgrade().unwrap().borrow().iter().enumerate() {
-            self.pipe_data_list[i].i_color = coloring_method(source.phase / (2.0 * PI));
-        }
+        self.phase_updated = true;
     }
 
     pub fn renderer(
@@ -160,6 +170,24 @@ impl SoundSourceViewer {
         view: Matrix4,
         projection: Matrix4,
     ) {
+        if self.phase_updated {
+            if self.pipe_data_list.len() != self.sources.upgrade().unwrap().borrow().len() {
+                let factory = &mut window.factory;
+                self.initialize_pipe_data(
+                    factory,
+                    self.vertex_buffer.clone().unwrap(),
+                    self.view.clone().unwrap(),
+                    window.output_color.clone(),
+                    window.output_stencil.clone(),
+                );
+            }
+
+            let coloring_method = self.settings.upgrade().unwrap().borrow().trans_coloring;
+            for (i, source) in self.sources.upgrade().unwrap().borrow().iter().enumerate() {
+                self.pipe_data_list[i].i_color = coloring_method(source.phase / (2.0 * PI));
+            }
+        }
+
         if self.position_updated {
             for i in 0..self.pipe_data_list.len() {
                 self.pipe_data_list[i].u_model_view_proj =
