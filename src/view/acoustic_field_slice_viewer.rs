@@ -4,7 +4,7 @@
  * Created Date: 27/04/2020
  * Author: Shun Suzuki
  * -----
- * Last Modified: 28/04/2020
+ * Last Modified: 29/04/2020
  * Modified By: Shun Suzuki (suzuki@hapis.k.u-tokyo.ac.jp)
  * -----
  * Copyright (c) 2020 Hapis Lab. All rights reserved.
@@ -175,6 +175,8 @@ impl AcousticFiledSliceViewer {
 
                 if self.position_updated {
                     let source_size = self.settings.upgrade().unwrap().borrow().source_size;
+                    let source_num = self.sources.upgrade().unwrap().borrow().len();
+                    data.u_trans_num = source_num as f32;
                     AcousticFiledSliceViewer::update_position_texture(
                         data,
                         &mut window.factory,
