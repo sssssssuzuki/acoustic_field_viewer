@@ -4,7 +4,7 @@
  * Created Date: 27/04/2020
  * Author: Shun Suzuki
  * -----
- * Last Modified: 28/04/2020
+ * Last Modified: 01/05/2020
  * Modified By: Shun Suzuki (suzuki@hapis.k.u-tokyo.ac.jp)
  * -----
  * Copyright (c) 2020 Hapis Lab. All rights reserved.
@@ -29,6 +29,7 @@ pub struct UpdateHandler {
     pub field_slice_viewer: AcousticFiledSliceViewer,
     pub sources: Rc<RefCell<Vec<SoundSource>>>,
     pub settings: Rc<RefCell<ViewerSettings>>,
+    pub camera: Camera<f32>,
 }
 
 impl UpdateHandler {
@@ -37,6 +38,7 @@ impl UpdateHandler {
         sound_source_viewer: SoundSourceViewer,
         field_slice_viewer: AcousticFiledSliceViewer,
         settings: Rc<RefCell<ViewerSettings>>,
+        camera: Camera<f32>,
     ) -> UpdateHandler {
         UpdateHandler {
             update_source_phase: false,
@@ -45,6 +47,7 @@ impl UpdateHandler {
             field_slice_viewer,
             sources,
             settings,
+            camera,
         }
     }
 
@@ -61,10 +64,11 @@ impl UpdateHandler {
         }
     }
 
-    pub fn update_source_phase(&mut self) {
+    pub fn update_phase(&mut self) {
         self.update_source_phase = true;
     }
-    pub fn update_source_pos(&mut self) {
+
+    pub fn update_position(&mut self) {
         self.update_source_pos = true;
     }
 }
@@ -76,7 +80,6 @@ where
     pub update: Option<F>,
     update_handler: UpdateHandler,
     projection: Matrix4,
-    camera: Camera<f32>,
     window: PistonWindow,
 }
 
@@ -127,9 +130,9 @@ where
                 sound_source_viewer,
                 field_slice_viewer,
                 ref_settings,
+                camera,
             ),
             projection,
-            camera,
             window,
         }
     }
@@ -137,7 +140,6 @@ where
     pub fn start(self) {
         let mut window = self.window;
         let mut update = self.update;
-        let camera = self.camera;
         let mut projection = self.projection;
         let mut update_handler = self.update_handler;
         while let Some(e) = window.next() {
@@ -154,13 +156,13 @@ where
                 update_handler.sound_source_viewer.renderer(
                     window,
                     &e,
-                    camera.orthogonal(),
+                    update_handler.camera.orthogonal(),
                     projection,
                 );
                 update_handler.field_slice_viewer.renderer(
                     window,
                     &e,
-                    camera.orthogonal(),
+                    update_handler.camera.orthogonal(),
                     projection,
                 );
             });

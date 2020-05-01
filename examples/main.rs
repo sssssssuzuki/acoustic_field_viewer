@@ -4,7 +4,7 @@
  * Created Date: 27/04/2020
  * Author: Shun Suzuki
  * -----
- * Last Modified: 28/04/2020
+ * Last Modified: 01/05/2020
  * Modified By: Shun Suzuki (suzuki@hapis.k.u-tokyo.ac.jp)
  * -----
  * Copyright (c) 2020 Hapis Lab. All rights reserved.
@@ -60,14 +60,14 @@ pub fn main() {
         let travel = 5.0;
         match button {
             Some(Button::Keyboard(Key::Up)) => {
-                update_handler
-                    .field_slice_viewer
-                    .translate([0., 0., travel]);
+                update_handler.camera.position =
+                    vecmath::vec3_add(update_handler.camera.position, [0., travel, 0.]);
+                update_handler.update_position();
             }
             Some(Button::Keyboard(Key::Down)) => {
-                update_handler
-                    .field_slice_viewer
-                    .translate([0., 0., -travel]);
+                update_handler.camera.position =
+                    vecmath::vec3_add(update_handler.camera.position, [0., travel, 0.]);
+                update_handler.update_position();
             }
             Some(Button::Keyboard(Key::Left)) => {
                 update_handler
@@ -109,7 +109,7 @@ pub fn main() {
 
                     source.phase = phase;
                 }
-                update_handler.update_source_phase();
+                update_handler.update_phase();
             }
             Some(Button::Keyboard(Key::F)) => {
                 focal_pos = vecmath::vec3_add(focal_pos, [-travel, 0., 0.]);
@@ -125,7 +125,7 @@ pub fn main() {
 
                     source.phase = phase;
                 }
-                update_handler.update_source_phase();
+                update_handler.update_phase();
             }
             _ => (),
         }
