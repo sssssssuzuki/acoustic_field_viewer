@@ -1,6 +1,6 @@
 [package]
 name = "acoustic_field_viewer"
-version = "0.0.4"
+version = "0.0.5"
 authors = ["shun suzuki <suzuki@hapis.k.u-tokyo.ac.jp>"]
 edition = "2018"
 

@@ -4,7 +4,7 @@
  * Created Date: 27/04/2020
  * Author: Shun Suzuki
  * -----
- * Last Modified: 01/05/2020
+ * Last Modified: 02/05/2020
  * Modified By: Shun Suzuki (suzuki@hapis.k.u-tokyo.ac.jp)
  * -----
  * Copyright (c) 2020 Hapis Lab. All rights reserved.
@@ -70,6 +70,14 @@ impl UpdateHandler {
 
     pub fn update_position(&mut self) {
         self.update_source_pos = true;
+    }
+
+    pub fn phase_updated(&self) -> bool {
+        self.update_source_phase
+    }
+
+    pub fn position_updated(&self) -> bool {
+        self.update_source_pos
     }
 }
 
