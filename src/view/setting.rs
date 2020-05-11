@@ -4,7 +4,7 @@
  * Created Date: 27/04/2020
  * Author: Shun Suzuki
  * -----
- * Last Modified: 28/04/2020
+ * Last Modified: 11/05/2020
  * Modified By: Shun Suzuki (suzuki@hapis.k.u-tokyo.ac.jp)
  * -----
  * Copyright (c) 2020 Hapis Lab. All rights reserved.
@@ -16,7 +16,7 @@ use scarlet::colormap::ListedColorMap;
 
 #[derive(Debug, Clone)]
 pub struct ViewerSettings {
-    pub freqency: f32,
+    pub frequency: f32,
     pub source_size: f32,
     pub wave_length: f32,
     pub trans_coloring: ColoringMethod,
@@ -27,15 +27,15 @@ pub struct ViewerSettings {
 
 impl ViewerSettings {
     pub fn new(
-        freqency: f32,
+        frequency: f32,
         source_size: f32,
         trans_coloring: ColoringMethod,
         field_color_map: ListedColorMap,
     ) -> ViewerSettings {
         ViewerSettings {
-            freqency,
+            frequency,
             source_size,
-            wave_length: 340e3 / freqency,
+            wave_length: 340e3 / frequency,
             trans_coloring,
             field_color_map,
             color_scale: 1.0,

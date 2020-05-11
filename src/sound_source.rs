@@ -4,14 +4,14 @@
  * Created Date: 27/04/2020
  * Author: Shun Suzuki
  * -----
- * Last Modified: 28/04/2020
+ * Last Modified: 11/05/2020
  * Modified By: Shun Suzuki (suzuki@hapis.k.u-tokyo.ac.jp)
  * -----
  * Copyright (c) 2020 Hapis Lab. All rights reserved.
  *
  */
 
-use crate::vec_utils::Vector3;
+use crate::Vector3;
 
 #[derive(Debug, Clone, Copy)]
 pub struct SoundSource {

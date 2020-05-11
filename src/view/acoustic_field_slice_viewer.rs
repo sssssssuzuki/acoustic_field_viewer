@@ -4,7 +4,7 @@
  * Created Date: 27/04/2020
  * Author: Shun Suzuki
  * -----
- * Last Modified: 29/04/2020
+ * Last Modified: 11/05/2020
  * Modified By: Shun Suzuki (suzuki@hapis.k.u-tokyo.ac.jp)
  * -----
  * Copyright (c) 2020 Hapis Lab. All rights reserved.
@@ -28,14 +28,14 @@ use scarlet::color::RGBColor;
 use scarlet::colormap::ColorMap;
 use shader_version::glsl::GLSL;
 use shader_version::Shaders;
+use vecmath_utils::{mat4, vec3, vec4};
 
 use std::cell::RefCell;
 use std::rc::Weak;
 
 use crate::sound_source::SoundSource;
-use crate::vec_utils;
-use crate::vec_utils::{Matrix4, Vector3};
 use crate::view::ViewerSettings;
+use crate::{Matrix4, Vector3};
 
 gfx_vertex_struct!(Vertex {
     a_pos: [i8; 4] = "a_pos",
@@ -91,7 +91,7 @@ impl AcousticFiledSliceViewer {
             settings: Weak::new(),
             pipe_data: None,
             sources: Weak::new(),
-            model: vec_utils::mat4_scale(150.),
+            model: mat4::scale(100.),
             pso_slice: None,
             position_updated: false,
             phase_updated: false,
@@ -103,10 +103,10 @@ impl AcousticFiledSliceViewer {
         let factory = &mut window.factory.clone();
 
         let vertex_data = vec![
-            Vertex::new([-1, 0, -1]),
-            Vertex::new([1, 0, -1]),
-            Vertex::new([1, 0, 1]),
-            Vertex::new([-1, 0, 1]),
+            Vertex::new([-1, -1, 0]),
+            Vertex::new([1, -1, 0]),
+            Vertex::new([1, 1, 0]),
+            Vertex::new([-1, 1, 0]),
         ];
         let index_data: &[u16] = &[0, 1, 2, 2, 3, 0];
         let (vertex_buffer, slice) =
@@ -144,15 +144,29 @@ impl AcousticFiledSliceViewer {
     }
 
     pub fn translate(&mut self, travel: Vector3) {
-        self.model[3][0] += travel[0];
-        self.model[3][1] += travel[1];
-        self.model[3][2] += travel[2];
+        mat4::translate(&mut self.model, travel);
+    }
+
+    pub fn position(&self) -> Vector3 {
+        mat4::to_pos(&self.model)
+    }
+
+    pub fn right(&self) -> Vector3 {
+        vec3::normalized(mat4::row3(self.model, 0))
+    }
+
+    pub fn up(&self) -> Vector3 {
+        vec3::normalized(mat4::row3(self.model, 1))
+    }
+
+    pub fn forward(&self) -> Vector3 {
+        vec3::normalized(mat4::row3(self.model, 2))
     }
 
     pub fn rotate(&mut self, axis: Vector3, rot: f32) {
         let rot = quaternion::axis_angle(axis, rot);
-        let rotm = vec_utils::mat4_rot(rot);
-        self.model = vecmath::col_mat4_mul(self.model, rotm);
+        let rotm = mat4::rot(rot);
+        self.model = mat4::mul(self.model, rotm);
     }
 
     pub fn renderer(
@@ -284,8 +298,8 @@ impl AcousticFiledSliceViewer {
         let texels: Vec<[u8; 4]> = sources
             .iter()
             .map(|source| {
-                let pos = vec_utils::to_vec4(source.pos);
-                vec_utils::vec4_map(pos, |p| ((p / source_size).round() as u16 % 256) as u8)
+                let pos = vec3::to_vec4(source.pos);
+                vec4::map(pos, |p| ((p / source_size).round() as u16 % 256) as u8)
             })
             .collect();
         let (_, texture_view) = factory
@@ -296,8 +310,8 @@ impl AcousticFiledSliceViewer {
         let texels: Vec<[u8; 4]> = sources
             .iter()
             .map(|source| {
-                let pos = vec_utils::to_vec4(source.pos);
-                vec_utils::vec4_map(pos, |p| ((p / source_size).round() as u16 / 256) as u8)
+                let pos = vec3::to_vec4(source.pos);
+                vec4::map(pos, |p| ((p / source_size).round() as u16 / 256) as u8)
             })
             .collect();
         let (_, texture_view) = factory
@@ -308,8 +322,8 @@ impl AcousticFiledSliceViewer {
         let texels: Vec<[u8; 4]> = sources
             .iter()
             .map(|source| {
-                let pos = vec_utils::to_vec4(source.pos);
-                vec_utils::vec4_map(pos, |p| {
+                let pos = vec3::to_vec4(source.pos);
+                vec4::map(pos, |p| {
                     (((p % source_size) / source_size * 256.0).round() as u16 % 256) as u8
                 })
             })
@@ -334,7 +348,7 @@ impl AcousticFiledSliceViewer {
         self.pipe_data = Some(pipe::Data {
             vertex_buffer,
             u_model_view_proj: [[0.; 4]; 4],
-            u_model: vecmath::mat4_id(),
+            u_model: mat4::id(),
             u_color_scale: 1.0,
             u_trans_size: source_size,
             u_trans_num: len as f32,

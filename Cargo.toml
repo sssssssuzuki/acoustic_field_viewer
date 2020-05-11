@@ -1,6 +1,6 @@
 [package]
 name = "acoustic_field_viewer"
-version = "0.0.5"
+version = "0.0.6"
 authors = ["shun suzuki <suzuki@hapis.k.u-tokyo.ac.jp>"]
 edition = "2018"
 
@@ -9,7 +9,6 @@ edition = "2018"
 [dependencies]
 camera_controllers = "0.31.0"
 piston_window = "0.89.0"
-vecmath = "1.0.0"
 gfx = "0.17.1"
 gfx_device_gl = "0.15.0"
 quaternion = "0.4.1"
@@ -20,3 +19,4 @@ find_folder = "0.3.0"
 conrod_piston = "0.69.0"
 rand = "0.7.3"
 scarlet = "1.1.0"
+vecmath_utils = {git = "https://github.com/sssssssuzuki/vecmath_utils.git", version="0.0.11"}

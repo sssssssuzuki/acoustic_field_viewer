@@ -4,7 +4,7 @@
  * Created Date: 27/04/2020
  * Author: Shun Suzuki
  * -----
- * Last Modified: 02/05/2020
+ * Last Modified: 11/05/2020
  * Modified By: Shun Suzuki (suzuki@hapis.k.u-tokyo.ac.jp)
  * -----
  * Copyright (c) 2020 Hapis Lab. All rights reserved.
@@ -19,8 +19,8 @@ use piston_window::Window;
 use piston_window::*;
 
 use crate::sound_source::SoundSource;
-use crate::vec_utils::Matrix4;
 use crate::view::{AcousticFiledSliceViewer, SoundSourceViewer, ViewerSettings};
+use crate::Matrix4;
 
 pub struct UpdateHandler {
     update_source_pos: bool,

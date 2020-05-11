@@ -4,7 +4,7 @@
  * Created Date: 27/04/2020
  * Author: Shun Suzuki
  * -----
- * Last Modified: 29/04/2020
+ * Last Modified: 11/05/2020
  * Modified By: Shun Suzuki (suzuki@hapis.k.u-tokyo.ac.jp)
  * -----
  * Copyright (c) 2020 Hapis Lab. All rights reserved.
@@ -27,14 +27,14 @@ use gfx_device_gl::Resources;
 use piston_window::*;
 use shader_version::glsl::GLSL;
 use shader_version::Shaders;
+use vecmath_utils::{mat4, qua};
 
 use std::cell::RefCell;
 use std::rc::Weak;
 
 use crate::sound_source::SoundSource;
-use crate::vec_utils;
-use crate::vec_utils::Matrix4;
 use crate::view::ViewerSettings;
+use crate::Matrix4;
 
 gfx_vertex_struct!(Vertex {
     a_pos: [i8; 4] = "a_pos",
@@ -140,7 +140,7 @@ impl SoundSourceViewer {
     pub(crate) fn init_model(&mut self) {
         let len = self.sources.upgrade().unwrap().borrow().len();
         let s = 0.5 * self.settings.upgrade().unwrap().borrow().source_size;
-        self.models = vec![vec_utils::mat4_scale(s); len];
+        self.models = vec![mat4::scale(s); len];
     }
 
     pub fn update_position(&mut self) {
@@ -152,9 +152,9 @@ impl SoundSourceViewer {
             self.models[i][3][0] = source.pos[0];
             self.models[i][3][1] = source.pos[1];
             self.models[i][3][2] = source.pos[2];
-            let rot = vec_utils::quaternion_to([0., 0., 1.], source.dir);
-            let rotm = vec_utils::mat4_rot(rot);
-            self.models[i] = vecmath::col_mat4_mul(self.models[i], rotm);
+            let rot = qua::to([0., 0., 1.], source.dir);
+            let rotm = mat4::rot(rot);
+            self.models[i] = mat4::mul(self.models[i], rotm);
         }
         self.position_updated = true;
     }
