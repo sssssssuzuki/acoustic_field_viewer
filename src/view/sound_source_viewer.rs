@@ -159,6 +159,10 @@ impl SoundSourceViewer {
         self.position_updated = true;
     }
 
+    pub fn camera_pos_update(&mut self) {
+        self.position_updated = true;
+    }
+
     pub fn update_phase(&mut self) {
         self.phase_updated = true;
     }

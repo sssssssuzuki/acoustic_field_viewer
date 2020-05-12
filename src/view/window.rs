@@ -4,7 +4,7 @@
  * Created Date: 27/04/2020
  * Author: Shun Suzuki
  * -----
- * Last Modified: 11/05/2020
+ * Last Modified: 12/05/2020
  * Modified By: Shun Suzuki (suzuki@hapis.k.u-tokyo.ac.jp)
  * -----
  * Copyright (c) 2020 Hapis Lab. All rights reserved.
@@ -25,6 +25,7 @@ use crate::Matrix4;
 pub struct UpdateHandler {
     update_source_pos: bool,
     update_source_phase: bool,
+    update_camera_pos: bool,
     pub sound_source_viewer: SoundSourceViewer,
     pub field_slice_viewer: AcousticFiledSliceViewer,
     pub sources: Rc<RefCell<Vec<SoundSource>>>,
@@ -43,6 +44,7 @@ impl UpdateHandler {
         UpdateHandler {
             update_source_phase: false,
             update_source_pos: false,
+            update_camera_pos: false,
             sound_source_viewer,
             field_slice_viewer,
             sources,
@@ -62,6 +64,14 @@ impl UpdateHandler {
             self.field_slice_viewer.update_source_pos();
             self.update_source_pos = false;
         }
+        if self.update_camera_pos {
+            self.sound_source_viewer.camera_pos_update();
+            self.update_camera_pos = false;
+        }
+    }
+
+    pub fn update_camera_pos(&mut self) {
+        self.update_camera_pos = true;
     }
 
     pub fn update_phase(&mut self) {
