@@ -1,6 +1,6 @@
 [package]
 name = "acoustic_field_viewer"
-version = "0.0.8"
+version = "0.0.9"
 authors = ["shun suzuki <suzuki@hapis.k.u-tokyo.ac.jp>"]
 edition = "2018"
 
@@ -19,4 +19,4 @@ find_folder = "0.3.0"
 conrod_piston = "0.69.0"
 rand = "0.7.3"
 scarlet = "1.1.0"
-vecmath_utils = {git = "https://github.com/sssssssuzuki/vecmath_utils.git", version="0.0.15"}
+vecmath_utils = {git = "https://github.com/sssssssuzuki/vecmath_utils.git", version="0.0.16"}

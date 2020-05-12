@@ -91,7 +91,7 @@ impl AcousticFiledSliceViewer {
             settings: Weak::new(),
             pipe_data: None,
             sources: Weak::new(),
-            model: mat4::scale(100.),
+            model: mat4::from_scale(100.),
             pso_slice: None,
             position_updated: false,
             phase_updated: false,
@@ -150,12 +150,14 @@ impl AcousticFiledSliceViewer {
     pub fn set_posture(&mut self, right: Vector3, up: Vector3) {
         let forward = vec3::cross(right, up);
         let pos = mat4::row(self.model, 3);
-        self.model = [
+        let model = [
             vec3::to_vec4(right),
             vec3::to_vec4(up),
             vec3::to_vec4(forward),
             pos,
         ];
+        let model = mat4::scale(model, 100.);
+        self.model = model;
     }
 
     pub fn position(&self) -> Vector3 {
@@ -176,7 +178,7 @@ impl AcousticFiledSliceViewer {
 
     pub fn rotate(&mut self, axis: Vector3, rot: f32) {
         let rot = quaternion::axis_angle(axis, rot);
-        let rotm = mat4::rot(rot);
+        let rotm = mat4::from_rot(rot);
         self.model = mat4::mul(self.model, rotm);
     }
 

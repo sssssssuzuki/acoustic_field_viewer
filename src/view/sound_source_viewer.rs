@@ -4,7 +4,7 @@
  * Created Date: 27/04/2020
  * Author: Shun Suzuki
  * -----
- * Last Modified: 11/05/2020
+ * Last Modified: 12/05/2020
  * Modified By: Shun Suzuki (suzuki@hapis.k.u-tokyo.ac.jp)
  * -----
  * Copyright (c) 2020 Hapis Lab. All rights reserved.
@@ -140,7 +140,7 @@ impl SoundSourceViewer {
     pub(crate) fn init_model(&mut self) {
         let len = self.sources.upgrade().unwrap().borrow().len();
         let s = 0.5 * self.settings.upgrade().unwrap().borrow().source_size;
-        self.models = vec![mat4::scale(s); len];
+        self.models = vec![mat4::from_scale(s); len];
     }
 
     pub fn update_position(&mut self) {
@@ -153,7 +153,7 @@ impl SoundSourceViewer {
             self.models[i][3][1] = source.pos[1];
             self.models[i][3][2] = source.pos[2];
             let rot = qua::to([0., 0., 1.], source.dir);
-            let rotm = mat4::rot(rot);
+            let rotm = mat4::from_rot(rot);
             self.models[i] = mat4::mul(self.models[i], rotm);
         }
         self.position_updated = true;
