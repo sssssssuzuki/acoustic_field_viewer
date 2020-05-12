@@ -4,7 +4,7 @@
  * Created Date: 27/04/2020
  * Author: Shun Suzuki
  * -----
- * Last Modified: 11/05/2020
+ * Last Modified: 12/05/2020
  * Modified By: Shun Suzuki (suzuki@hapis.k.u-tokyo.ac.jp)
  * -----
  * Copyright (c) 2020 Hapis Lab. All rights reserved.
@@ -145,6 +145,17 @@ impl AcousticFiledSliceViewer {
 
     pub fn translate(&mut self, travel: Vector3) {
         mat4::translate(&mut self.model, travel);
+    }
+
+    pub fn set_posture(&mut self, right: Vector3, up: Vector3) {
+        let forward = vec3::cross(right, up);
+        let pos = mat4::row(self.model, 3);
+        self.model = [
+            vec3::to_vec4(right),
+            vec3::to_vec4(up),
+            vec3::to_vec4(forward),
+            pos,
+        ];
     }
 
     pub fn position(&self) -> Vector3 {
